@@ -96,16 +96,16 @@ void loop() {
   Serial.println("while fini"); Serial.flush();
 
   bool change, gagne;
-//  switch (game_mode)
-//  {
-//    case 0:
-//    Serial.println("case 0"); Serial.flush();
-//      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
+  switch (game_mode)
+  {
+    case 0:
+      Serial.println("case 0"); Serial.flush();
+      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
         manche(3, 1, &change, &gagne);
         Serial.println("manche finie (case)"); Serial.flush();
         gerer_victoire(&change, &gagne);
         Serial.println("gerer_victoire finie"); Serial.flush();
-//      }
+      }
 //      break;
 //    case 1:
 //      Serial.println("case 0"); Serial.flush();
@@ -130,7 +130,7 @@ void loop() {
 //        gerer_victoire(&change, &gagne);
 //      }
 //      break;
-//  }
+  }
   Serial.println("switch fini"); Serial.flush();
   Serial.println("loop fini"); Serial.flush();
 }
@@ -140,10 +140,11 @@ void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagn
   bool contenu[NB_PORTES] = {0,0,0,0,0}; // 5 étant le nombre max de portes
   unsigned char etat[NB_PORTES] = {0,0,0,0,0}; // 0 fermé ; 1 ouvert ; 2 choisi (a) ; 3 choisi (b)
   long voiture = random(n);
+  Serial.print("voiture choisie :");Serial.println(voiture); Serial.flush();
   contenu[voiture] = 1;
 
-  unsigned int i;
-  unsigned int j;
+  unsigned long i;
+  unsigned long j;
   for(i=0 ; i++ ; i<NB_PORTES) {
     if(i==voiture) {
       servo_voiture[i].write(90); // par convention, 90° correspond à "on voit la voiture"
@@ -165,6 +166,7 @@ void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagn
       pres = random(n);
       delay(10);
     } while(etat[pres] || contenu[pres]) ;
+    Serial.print("voiture choisie (présentateur) :") ; Serial.println(pres) ; Serial.flush();
     etat[pres] = 1;
     servo_porte[pres].write(90); // par convention, 90° correspond à "porte ouverte"
     delay(500); //attendre 500 ms
@@ -180,6 +182,9 @@ void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagn
 
   *change = (bool) (i != j);
   *gagne = contenu[j];
+
+  Serial.print("Change, gagne : ") ; Serial.print(*change) ; Serial.println(*gagne) ; Serial.flush();
+
 
   Serial.println("manche finie"); Serial.flush();
 }
@@ -199,12 +204,13 @@ void afficher(char chiffre) {
     }
 }
 
-void choisir_porte(unsigned char etat[], unsigned int *i, char valeur) {
+void choisir_porte(unsigned char etat[], unsigned long *i, char valeur) {
   bool choix_fait = false;
   while (!choix_fait) {
     for(*i=0 ; *i++ ; *i<NB_PORTES) {
       bool bouton_presse = digitalRead(PORT_BOUTON_PORTE[*i]);
       if(bouton_presse == HIGH) {
+        Serial.print("Porte choisie (joueur) : ");Serial.println(*i); Serial.flush();
         etat[*i] = valeur;
         choix_fait = true;
         break;
