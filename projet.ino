@@ -54,10 +54,7 @@ void setup() {
   }
 
   // initialisation de l'afficheur
-  for (i=0 ; i<4 ; i++)
-  {
-    digitalWrite(AFFICHEUR[i], LOW);
-  }
+  afficher(1);
 
   randomSeed(analogRead(0));
 
