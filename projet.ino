@@ -30,7 +30,7 @@ Adafruit_NeoPixel led_porte[NB_PORTES];
 Servo servo_porte[NB_PORTES];
 Servo servo_voiture[NB_PORTES];
 
-unsigned char solo = digitalRead(PORT_SWITCH);
+int solo = digitalRead(PORT_SWITCH);
 unsigned char game_mode = 0; // décrémenté de 1 par rapport au pseudo-code (et à l'afficheur)
 bool joueur = 0;
 
@@ -51,7 +51,6 @@ void setup() {
   unsigned char i;
   for (i=0 ; i<NB_PORTES ; i++)
   {
-    pinMode(PORT_BOUTON_PORTE[i], INPUT);
     led_porte[i]=Adafruit_NeoPixel(1, PORT_LED_PORTE[i], NEO_GRB + NEO_KHZ800);
     pinMode(PORT_BOUTON_PORTE[i], INPUT_PULLUP);
     led_porte[i].begin();
@@ -60,6 +59,11 @@ void setup() {
     servo_voiture[i].attach(PORT_SERVO_VOITURE[i]);
     servo_porte[i].write(0); // par convention, 0 correspond à "porte fermée"
     servo_voiture[i].write(0); // par convention, 0 correspond à "on voit la chèvre"
+  }
+
+  for (i=0 ; i<4 ; i++)
+  {
+    pinMode(AFFICHEUR[i], OUTPUT); // à renégocier quand on rajoutera le BCD/7segments
   }
 
   // initialisation de l'afficheur
@@ -76,9 +80,10 @@ void loop() {
 
   Serial.println("loop commencee"); Serial.flush();
   unsigned long last_change=millis();
-  while ((last_change - millis()) < (unsigned long) 3000)
+  while ((millis() - last_change) < (unsigned long) 10000)
   {
-//    Serial.println((last_change - millis())); Serial.flush();
+    Serial.println("Dans le while"); Serial.flush();
+    Serial.println(last_change);Serial.println(millis());Serial.flush();
     delay(10);
     if (digitalRead(PORT_SWITCH) != solo) // (solo != solo=digitalRead(PORT_SWITCH))
     {
@@ -91,6 +96,7 @@ void loop() {
       game_mode++;
       game_mode%=4;
       afficher(game_mode+1 +4*(solo==0));
+      delay(500);
     }
   }
   Serial.println("while fini"); Serial.flush();
@@ -102,27 +108,25 @@ void loop() {
       Serial.println("case 0"); Serial.flush();
       while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
         manche(3, 1, &change, &gagne);
-        Serial.println("manche finie (case)"); Serial.flush();
         gerer_victoire(&change, &gagne);
-        Serial.println("gerer_victoire finie"); Serial.flush();
       }
 //      break;
 //    case 1:
-//      Serial.println("case 0"); Serial.flush();
+//      Serial.println("case 1"); Serial.flush();
 //      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
 //        manche(5, 1, &change, &gagne);
 //        gerer_victoire(&change, &gagne);
 //      }
 //      break;
 //    case 2:
-//      Serial.println("case 0"); Serial.flush();
+//      Serial.println("case 2"); Serial.flush();
 //      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
 //        manche(5, 3, &change, &gagne);
 //        gerer_victoire(&change, &gagne);
 //      }
 //      break;
 //    case 3:
-//      Serial.println("case 0"); Serial.flush();
+//      Serial.println("case 3"); Serial.flush();
 //      unsigned char increment[2]={0,0};
 //      while(increment[0]<=2 && increment[1]<=2) {
 //        manche(3+increment[joueur], 1+increment[joueur], &change, &gagne);
@@ -143,14 +147,13 @@ void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagn
   Serial.print("voiture choisie :");Serial.println(voiture); Serial.flush();
   contenu[voiture] = 1;
 
-  unsigned long i;
-  unsigned long j;
-  for(i=0 ; i++ ; i<NB_PORTES) {
-    if(i==voiture) {
-      servo_voiture[i].write(90); // par convention, 90° correspond à "on voit la voiture"
+  unsigned long i,j,m;
+  for(m=0 ; m++ ; m<NB_PORTES) {
+    if(m==voiture) {
+      servo_voiture[m].write(90); // par convention, 90° correspond à "on voit la voiture"
     }
     else {
-      servo_voiture[i].write(0);
+      servo_voiture[m].write(0);
     }
   }
 
@@ -161,10 +164,9 @@ void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagn
   Serial.println("choix porte 1 OK"); Serial.flush();
 
   long pres;
-  for(i=0 ; i++ ; i<k) {
+  for(m=0 ; m++ ; m<k) {
     do {
       pres = random(n);
-      delay(10);
     } while(etat[pres] || contenu[pres]) ;
     Serial.print("voiture choisie (présentateur) :") ; Serial.println(pres) ; Serial.flush();
     etat[pres] = 1;
@@ -192,27 +194,43 @@ void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagn
 // fonction écrivant sur un seul afficheur
 void afficher(char chiffre) {
     // On allume les bits nécessaires
+     if(chiffre >= 8)
+    {
+      digitalWrite(AFFICHEUR[3], LOW);
+        chiffre = chiffre - 8;
+    }
+    else { digitalWrite(AFFICHEUR[3], HIGH); }
+     if(chiffre >= 4)
+    {
+      digitalWrite(AFFICHEUR[2], LOW);
+        chiffre = chiffre - 4;
+    }
+    else { digitalWrite(AFFICHEUR[2], HIGH); }
     if(chiffre >= 2)
     {
-      digitalWrite(AFFICHEUR[1], HIGH);
+      digitalWrite(AFFICHEUR[1], LOW);
         chiffre = chiffre - 2;
     }
+    else { digitalWrite(AFFICHEUR[1], HIGH); }
     if(chiffre == 1)
     {
-        digitalWrite(AFFICHEUR[0], HIGH);
+        digitalWrite(AFFICHEUR[0], LOW);
         // chiffre = chiffre - 1;
     }
+    else { digitalWrite(AFFICHEUR[0], HIGH); }
 }
 
 void choisir_porte(unsigned char etat[], unsigned long *i, char valeur) {
   bool choix_fait = false;
+  unsigned long stub;
   while (!choix_fait) {
-    for(*i=0 ; *i++ ; *i<NB_PORTES) {
-      bool bouton_presse = digitalRead(PORT_BOUTON_PORTE[*i]);
+    for(stub=0 ; stub<NB_PORTES ; stub++) {
+      int bouton_presse = digitalRead(PORT_BOUTON_PORTE[stub]);
       if(bouton_presse == HIGH) {
-        Serial.print("Porte choisie (joueur) : ");Serial.println(*i); Serial.flush();
-        etat[*i] = valeur;
+        Serial.print("Porte choisie (joueur) : ");Serial.println(stub); Serial.flush();
+        etat[stub] = valeur;
         choix_fait = true;
+        *i=stub;
         break;
       }
     }
