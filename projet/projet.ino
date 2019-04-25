@@ -9,10 +9,11 @@
 
 #define NB_PORTES 5
 #define LONGUEUR_BARRE_LED 10
+#define NB_SEGMENTS 7
 
 void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagne);
 void afficher(char chiffre);
-void choisir_porte(unsigned char etat[], unsigned int *i, char valeur);
+void choisir_porte(unsigned char etat[], unsigned long int *i, char valeur);
 void gerer_victoire(bool *change, bool *gagne);
 
 
@@ -20,8 +21,18 @@ const unsigned char PORT_LED_PORTE[NB_PORTES]={7,8,9,10,11};
 const unsigned char PORT_BOUTON_PORTE[NB_PORTES]={14,15,16,17,18};
 const unsigned char PORT_SERVO_PORTE[NB_PORTES]={19,20,21,22,23};
 const unsigned char PORT_SERVO_VOITURE[NB_PORTES]={24,25,26,27,28};
-const unsigned char AFFICHEUR[4]={33,34,35,36}; // on n'aura besoin que des 2 bits de poids faible (33,34)
-
+const unsigned char PORT_SEG_AFF[NB_SEGMENTS]={40,41,42,43,44,45,46}; // segments de l'afficheur dans l'ordre A, B... G
+const byte ETAT_SEG[9]={
+  0b0111111,
+  0b0000110,
+  0b1011011,
+  0b1001111,
+  0b1100110,
+  0b1101101,
+  0b1111101,
+  0b0000111,
+  0b1111111};
+  
 Adafruit_NeoPixel barre_led_g = Adafruit_NeoPixel(LONGUEUR_BARRE_LED, PORT_BARRE_LED_G, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel barre_led_d = Adafruit_NeoPixel(LONGUEUR_BARRE_LED, PORT_BARRE_LED_D, NEO_GRB + NEO_KHZ800);
 unsigned char led[2]={0,0}; // niveau des barres de led
@@ -61,9 +72,9 @@ void setup() {
     servo_voiture[i].write(0); // par convention, 0 correspond à "on voit la chèvre"
   }
 
-  for (i=0 ; i<4 ; i++)
-  {
-    pinMode(AFFICHEUR[i], OUTPUT); // à renégocier quand on rajoutera le BCD/7segments
+  for (i=0; i<NB_SEGMENTS; i++){
+    pinMode(PORT_SEG_AFF[i], OUTPUT);
+    digitalWrite(PORT_SEG_AFF[i], HIGH);
   }
 
   // initialisation de l'afficheur
@@ -80,10 +91,8 @@ void loop() {
 
   Serial.println("loop commencee"); Serial.flush();
   unsigned long last_change=millis();
-  while ((millis() - last_change) < (unsigned long) 10000)
+  while ((millis() - last_change) < (unsigned long) 5000)
   {
-    Serial.println("Dans le while"); Serial.flush();
-    Serial.println(last_change);Serial.println(millis());Serial.flush();
     delay(10);
     if (digitalRead(PORT_SWITCH) != solo) // (solo != solo=digitalRead(PORT_SWITCH))
     {
@@ -110,30 +119,30 @@ void loop() {
         manche(3, 1, &change, &gagne);
         gerer_victoire(&change, &gagne);
       }
-//      break;
-//    case 1:
-//      Serial.println("case 1"); Serial.flush();
-//      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
-//        manche(5, 1, &change, &gagne);
-//        gerer_victoire(&change, &gagne);
-//      }
-//      break;
-//    case 2:
-//      Serial.println("case 2"); Serial.flush();
-//      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
-//        manche(5, 3, &change, &gagne);
-//        gerer_victoire(&change, &gagne);
-//      }
-//      break;
-//    case 3:
-//      Serial.println("case 3"); Serial.flush();
-//      unsigned char increment[2]={0,0};
-//      while(increment[0]<=2 && increment[1]<=2) {
-//        manche(3+increment[joueur], 1+increment[joueur], &change, &gagne);
-//        if(gagne) {increment[joueur]++;}
-//        gerer_victoire(&change, &gagne);
-//      }
-//      break;
+      break;
+    case 1:
+      Serial.println("case 1"); Serial.flush();
+      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
+        manche(5, 1, &change, &gagne);
+        gerer_victoire(&change, &gagne);
+      }
+      break;
+    case 2:
+      Serial.println("case 2"); Serial.flush();
+      while(led[0]!=LONGUEUR_BARRE_LED && led[1]!=LONGUEUR_BARRE_LED) {
+        manche(5, 3, &change, &gagne);
+        gerer_victoire(&change, &gagne);
+      }
+      break;
+    case 3:
+      Serial.println("case 3"); Serial.flush();
+      unsigned char increment[2]={0,0};
+      while(increment[0]<=2 && increment[1]<=2) {
+        manche(3+increment[joueur], 1+increment[joueur], &change, &gagne);
+        if(gagne) {increment[joueur]++;}
+        gerer_victoire(&change, &gagne);
+      }
+      break;
   }
   Serial.println("switch fini"); Serial.flush();
   Serial.println("loop fini"); Serial.flush();
@@ -193,33 +202,14 @@ void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagn
 
 // fonction écrivant sur un seul afficheur
 void afficher(char chiffre) {
-    // On allume les bits nécessaires
-     if(chiffre >= 8)
-    {
-      digitalWrite(AFFICHEUR[3], LOW);
-        chiffre = chiffre - 8;
-    }
-    else { digitalWrite(AFFICHEUR[3], HIGH); }
-     if(chiffre >= 4)
-    {
-      digitalWrite(AFFICHEUR[2], LOW);
-        chiffre = chiffre - 4;
-    }
-    else { digitalWrite(AFFICHEUR[2], HIGH); }
-    if(chiffre >= 2)
-    {
-      digitalWrite(AFFICHEUR[1], LOW);
-        chiffre = chiffre - 2;
-    }
-    else { digitalWrite(AFFICHEUR[1], HIGH); }
-    if(chiffre == 1)
-    {
-        digitalWrite(AFFICHEUR[0], LOW);
-        // chiffre = chiffre - 1;
-    }
-    else { digitalWrite(AFFICHEUR[0], HIGH); }
+    unsigned char m ;
+  int segment = ETAT_SEG[chiffre];
+//  Serial.println(segment);
+  for (m=0; m<NB_SEGMENTS; m++){
+    digitalWrite(PORT_SEG_AFF[m], !bitRead(ETAT_SEG[chiffre],m));
+//    Serial.println( !bitRead(ETAT_SEG[chiffre],m)); Serial.flush();
+  }
 }
-
 void choisir_porte(unsigned char etat[], unsigned long *i, char valeur) {
   bool choix_fait = false;
   unsigned long stub;
