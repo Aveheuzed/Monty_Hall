@@ -50,6 +50,7 @@ int solo;
 unsigned char game_mode; // décrémenté de 1 par rapport au pseudo-code (et à l'afficheur)
 bool joueur;
 
+
 void setup() {
   // put your setup code here, to run once:
 
@@ -89,24 +90,18 @@ void setup() {
     digitalWrite(PORT_SEG_AFF[i], HIGH);
   }
   afficher(1);
-  
+
   randomSeed(analogRead(0)); // initialisation du random
 
-  
-}
 
 
-
-
-void loop() {
-  // put your main code here, to run repeatedly:
 
   // récupération des paramètres de jeu : mode de jeu + nombre de joueurs
   unsigned long last_change=millis();
   // on attend qu'il n'y ait pas eu d'interaction pendant 3s avant de valider les paramères de jeu
+  delay(50); // attendre 50ms pour que millis() devienne différent de last_change ?
   while ((millis() - last_change) < 3000)
   {
-    delay(50); // il ne faut pas boucler "dans le vide" sinon la carte reset
     if (digitalRead(PORT_SWITCH) != solo)
     {
       last_change = millis();
@@ -119,6 +114,7 @@ void loop() {
       game_mode%=4;
       afficher(game_mode+1); // on affiche de 1 à 4, pas de 0 à 3
     }
+    delay(50); // il ne faut pas boucler "dans le vide" sinon la carte reset
   }
 
   bool change, gagne;
@@ -151,72 +147,66 @@ void loop() {
       }
       break;
   }
-
-  setup(); // pour la réinitialisation des variables
 }
 
 
+void loop() {}
 
 void manche(const unsigned int n, const unsigned int k, bool *change, bool *gagne) {
   /*
    * gestion d'une seule manche
    */
-  bool contenu[NB_PORTES] = {0,0,0,0,0}; // 5 étant le nombre max de portes (d'après #define)
-  unsigned char etat[NB_PORTES] = {0,0,0,0,0}; // 0 fermé ; 1 ouvert ; 2 choisi (a) ; 3 choisi (b)
-  long voiture = random(n);
+  bool contenu[NB_PORTES] = {0}; // ce tableau est initialisé à 0 pour chaque indice
+  unsigned char etat[NB_PORTES] = {0}; // 0 fermé ; 1 ouvert ; 2 choisi (a) ; 3 choisi (b)
+  int voiture = (int) random((long) n);
   contenu[voiture] = 1;
 
-  unsigned long i,j,m; // i,j choix du joueur ; m variable d'incrémentation
-  for(m=0 ; m++ ; m<NB_PORTES) {
+  unsigned int i,j,m; // i,j choix du joueur ; m variable d'incrémentation
+  for (m=0 ; m++ ; m<NB_PORTES) {
+    allumer_led(led_porte[m], 0, 0, 0, 0); // on éteint les leds de chaque porte avant de commencer
     if(m==voiture) {
       servo_voiture[m].write(MAX_ANGLE);
     }
     else {
-      servo_voiture[m].write(0);
+      servo_voiture[m].write(MIN_ANGLE);
     }
   }
   choisir_porte(etat, &i, 2);
 
-  long pres;
+  int pres;
   for(m=0 ; m++ ; m<k) { // on choisit k pourtes à ouvrir par le présentateur
     do {
-      pres = random(n);
+      pres = (int) random((long) n);
     } while(etat[pres] || contenu[pres]) ; // la porte doit contenir une chèvre et ne pas avoir déjà été choisie
     etat[pres] = 1;
-    led_porte[pres].setPixelColor(0, led_porte[pres].Color(0,0,127));
-    led_porte[pres].show();
+    allumer_led(led_porte[pres], 0 , 0, 0, 127)
     servo_porte[pres].write(MAX_ANGLE);
-    delay(500); //attendre le servo pendant 500 ms 
+    delay(500); //attendre le servo pendant 500 ms
   }
-  
+
   choisir_porte(etat, &j, 3);
-  
+
   servo_porte[j].write(MAX_ANGLE); // on ouvre la 2e porte choisie par le joueur
 
   *change = (bool) (i != j);
   *gagne = contenu[j];
 
-  led_porte[i].setPixelColor(0, led_porte[j].Color(0,0,0));
   if (*gagne)
   {
-    led_porte[j].setPixelColor(0, led_porte[j].Color(0,127,0));
+    allumer_led(led_porte[j], 0, 0, 127, 0);
   }
   else
   {
-    led_porte[j].setPixelColor(0, led_porte[j].Color(127,0,0));
+    allumer_led(led_porte[j], 0, 127, 0, 0);
   }
-  led_porte[i].show();
-  led_porte[j].show();
-  
 }
 
-// fonction écrivant sur un afficheur
 void afficher(char chiffre) {
-    unsigned char m ;
+  /* fonction écrivant sur un seul afficheur */
+  unsigned char m ;
   int segment = ETAT_SEG[chiffre];
-//  Serial.println(segment);
   for (m=0; m<NB_SEGMENTS; m++){
-    digitalWrite(PORT_SEG_AFF[m], !bitRead(ETAT_SEG[chiffre],m)); // bitRead : 
+    digitalWrite(PORT_SEG_AFF[m], !bitRead(ETAT_SEG[chiffre],m)); // bitRead :
   }
 }
 
@@ -226,10 +216,9 @@ void choisir_porte(unsigned char etat[], unsigned long *i, char valeur) {
   while (!choix_fait) {
     for(stub=0 ; stub<NB_PORTES ; stub++) { // /!\ pas de pointeur dans le for !
       int bouton_presse = digitalRead(PORT_BOUTON_PORTE[stub]);
-      if (bouton_presse == HIGH) {
+      if (bouton_presse == LOW) {
         etat[stub] = valeur;
-        led_porte[stub].setPixelColor(0, led_porte[stub].Color(127,127,0));
-        led_porte[stub].show();
+        allumer_led(led_porte[stub], 0, 127, 127, 0);
         choix_fait = true;
         *i=stub;
         break;
@@ -240,7 +229,7 @@ void choisir_porte(unsigned char etat[], unsigned long *i, char valeur) {
 }
 
 void gerer_victoire(bool *change, bool *gagne) {
-  /* fonction gérant l'allumage des leds et le changement de joueurs en multijoueur ; appelée à la fin d'une manche 
+  /* fonction gérant l'allumage des leds et le changement de joueurs en multijoueur ; appelée à la fin d'une manche
    *  (même si la manche a été pardue)
    */
     if (solo) {
@@ -257,13 +246,12 @@ void gerer_victoire(bool *change, bool *gagne) {
       joueur = 1 - joueur;
     }
   // on actualise la led la plus haute de la barre / on en allume une de plus
-  barre_led_haut.setPixelColor(led[0], barre_led_haut.Color(255, 255, 15));
-  barre_led_bas.setPixelColor(led[1], barre_led_bas.Color(255, 255, 15));
+  allumer_led(barre_led_haut, led[0], 255, 255, 15);
+  allumer_led(barre_led_bas, led[1], 255, 255, 15);
 }
 
-
 void jouer_melodie() {
-  /* 
+  /*
    *  joue la mélodie de victoire
    *  copié de http://www.arduino.cc/en/Tutorial/Tone
    *  created 21 Jan 2010
@@ -289,3 +277,7 @@ void jouer_melodie() {
   }
 }
 
+void allumer_led(Adafruit_NeoPixel ruban, int index, int r, int v, int b) {
+  ruban.setPixelColor(index, ruban.Color(r,v,b))
+  ruban.show()
+}
